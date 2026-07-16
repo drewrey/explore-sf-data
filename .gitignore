@@ -1,0 +1,11 @@
+# Raw data is refetchable via scripts/fetch_boundaries.py — never committed
+data/raw/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

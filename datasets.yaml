@@ -1,0 +1,51 @@
+# Registry of DataSF datasets used in this project.
+#
+# Each entry:
+#   id:     9-character Socrata dataset ID (from the data.sfgov.org URL)
+#   format: geojson | csv   (how we fetch it from the SODA API)
+#   name:   official title on DataSF
+#   notes:  why we use it / anything non-obvious
+#
+# Fetch with:  from sfdata import fetch; gdf = fetch.load("supervisor_districts")
+
+datasets:
+  city_boundary:
+    id: txuc-3kzm
+    format: geojson
+    name: SF Shoreline and Islands
+    notes: >-
+      Land area of the City and County of San Francisco (shoreline-trimmed,
+      includes islands). Used as the base city outline.
+
+  supervisor_districts:
+    id: cqbw-m5m3
+    format: geojson
+    name: Current Supervisor Districts
+    notes: >-
+      The 11 current supervisor districts (post-2022 redistricting; DataSF
+      keeps this dataset pointed at whatever is current). For the 2012-2022
+      era use keex-zmn4.
+
+  analysis_neighborhoods:
+    id: j2bu-swwd
+    format: geojson
+    name: Analysis Neighborhoods
+    notes: >-
+      The 41 Analysis Neighborhoods DataSF uses for citywide statistics; most
+      neighborhood-level datasets key to these names.
+
+  census_tracts:
+    id: tmph-tgz9
+    format: geojson
+    name: "Census 2020: Tracts for San Francisco"
+    notes: >-
+      2020 census tract polygons; the join target for tract-keyed data
+      (ACS, demographics).
+
+  tracts_to_neighborhoods:
+    id: sevw-6tgi
+    format: csv
+    name: Analysis Neighborhoods - 2020 census tracts assigned to neighborhoods
+    notes: >-
+      Crosswalk from 2020 census tracts to Analysis Neighborhoods, for
+      rolling tract-level data up to neighborhoods without a spatial join.
