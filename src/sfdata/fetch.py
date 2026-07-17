@@ -28,6 +28,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 REGISTRY_PATH = REPO_ROOT / "datasets.yaml"
 RAW_DIR = REPO_ROOT / "data" / "raw"
 PROCESSED_DIR = REPO_ROOT / "data" / "processed"
+REFERENCE_DIR = REPO_ROOT / "data" / "reference"
 
 # SODA returns at most this many rows per request; we page until exhausted.
 PAGE_SIZE = 50_000
@@ -106,6 +107,11 @@ def load(name: str, refresh: bool = False) -> pd.DataFrame | gpd.GeoDataFrame:
     if registry()[name]["format"] == "geojson":
         return gpd.read_file(path)
     return pd.read_csv(path)
+
+
+def load_reference(name: str) -> pd.DataFrame:
+    """Load a hand-curated CSV from data/reference/ (committed, not from DataSF)."""
+    return pd.read_csv(REFERENCE_DIR / f"{name}.csv")
 
 
 def soql(dataset_id: str, query: str) -> pd.DataFrame:

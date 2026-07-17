@@ -30,6 +30,7 @@ site/              static site (MapLibre GL + Vega-Lite), no build step
 | `src/sfdata/` | Shared Python: SODA fetch/cache layer, geo helpers |
 | `scripts/` | Pipeline entry points (e.g. `fetch_boundaries.py`) |
 | `data/raw/` | Raw downloads (gitignored) |
+| `data/reference/` | Hand-curated reference data (committed), e.g. supervisor tenures by district since 2001, sourced from Wikipedia's Board of Supervisors timeline with corrections verified against news reports |
 | `data/processed/` | Derived outputs the site and notebooks consume (committed) |
 | `notebooks/` | Jupyter notebooks for exploration |
 | `site/` | The publishable static site |

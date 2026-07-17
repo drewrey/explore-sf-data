@@ -42,6 +42,16 @@ datasets:
       2020 census tract polygons; the join target for tract-keyed data
       (ACS, demographics).
 
+  park_scores:
+    id: r33y-seqv
+    format: csv
+    name: Annual Park Evaluation Scores (FY15-now)
+    notes: >-
+      Rec & Park maintenance evaluation scores per park per fiscal year
+      (FY2015-). park_score is a 0-1 fraction. supervisor_district can be
+      comma-separated when a park spans districts; district assignments
+      reflect current (post-2022) boundaries for all years.
+
   tracts_to_neighborhoods:
     id: sevw-6tgi
     format: csv

@@ -42,6 +42,10 @@
     padding: 14px 20px 12px;
     border-bottom: 1px solid var(--border);
   }
+  nav { font-size: 13px; margin-bottom: 6px; }
+  nav a { color: var(--text-secondary); text-decoration: none; margin-right: 14px; }
+  nav a[aria-current] { color: var(--text-primary); font-weight: 650; }
+  nav a:hover { color: var(--accent); }
   header h1 { font-size: 17px; font-weight: 650; }
   header p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
   .filters {
@@ -87,6 +91,10 @@
 </head>
 <body>
 <header>
+  <nav>
+    <a href="index.html" aria-current="page">Boundaries</a>
+    <a href="parks.html">Park scores</a>
+  </nav>
   <h1>Exploring SF Data — boundaries</h1>
   <p>The city's regional boundaries from <a href="https://data.sfgov.org" style="color:var(--accent)">DataSF</a>: the join targets for everything else in this project.</p>
 </header>
@@ -146,7 +154,7 @@ function init() {
   });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
 
-  map.on("load", async () => {
+  map.once("style.load", async () => {
     const { fill, line } = accent();
     for (const name of Object.keys(LAYERS)) {
       const data = await fetch(`${DATA_BASE}/${name}.geojson`).then(r => r.json());

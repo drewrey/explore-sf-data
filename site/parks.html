@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SF Park Scores by District</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+  }
+  header { padding: 14px 20px 12px; border-bottom: 1px solid var(--border); }
+  nav { font-size: 13px; margin-bottom: 6px; }
+  nav a { color: var(--text-secondary); text-decoration: none; margin-right: 14px; }
+  nav a[aria-current] { color: var(--text-primary); font-weight: 650; }
+  nav a:hover { color: var(--accent); }
+  header h1 { font-size: 17px; font-weight: 650; }
+  header p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; max-width: 72ch; }
+  header a { color: var(--accent); }
+  .filters { display: flex; gap: 6px; padding: 12px 20px 4px; flex-wrap: wrap; align-items: center; }
+  .filters .label { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+  .filters button {
+    font: inherit; font-size: 13px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 12px;
+    cursor: pointer;
+  }
+  .filters button:hover { background: var(--surface-1); }
+  .filters button[aria-pressed="true"] {
+    color: var(--text-primary);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    font-weight: 600;
+  }
+  .caveat { padding: 4px 20px 0; font-size: 12px; color: var(--muted); max-width: 90ch; }
+  main {
+    display: grid;
+    grid-template-columns: minmax(340px, 1fr) minmax(340px, 1fr);
+    gap: 16px;
+    padding: 14px 20px 20px;
+  }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel h2 { font-size: 13.5px; font-weight: 650; padding: 12px 14px 2px; }
+  .panel .sub { font-size: 12px; color: var(--text-secondary); padding: 0 14px 8px; }
+  #map { height: 520px; }
+  #chart { padding: 0 8px 8px; overflow-x: auto; }
+  .legend { display: flex; align-items: center; gap: 8px; padding: 10px 14px; font-size: 11.5px; color: var(--muted); }
+  .legend .bar {
+    width: 140px; height: 8px; border-radius: 4px;
+    background: linear-gradient(to right, #cde2fb, #86b6ef, #3987e5, #1c5cab, #0d366b);
+  }
+  .tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 11px; font-size: 12.5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); max-width: 280px;
+  }
+  .tooltip .sub { color: var(--text-secondary); }
+  .tooltip .num { font-weight: 650; }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <a href="index.html">Boundaries</a>
+    <a href="parks.html" aria-current="page">Park scores</a>
+  </nav>
+  <h1>Park maintenance scores by supervisor district</h1>
+  <p>Rec &amp; Park evaluates every park each year; scores are the fraction of standards met
+     (observed range 0.6–1.0). Data: <a href="https://data.sfgov.org/Culture-and-Recreation/Annual-Park-Evaluation-Scores-FY15-now-/r33y-seqv/about_data">Annual Park Evaluation Scores</a>, DataSF.</p>
+</header>
+
+<div class="filters" role="group" aria-label="Fiscal year" id="years">
+  <span class="label">Fiscal year</span>
+</div>
+<p class="caveat">FY2021 has no data (evaluations paused during COVID). District assignments
+reflect current post-2022 boundaries for all years; parks spanning districts count in each.</p>
+
+<main>
+  <section class="panel">
+    <h2>Mean score by district</h2>
+    <p class="sub" id="map-sub"></p>
+    <div id="map"></div>
+    <div class="legend">
+      <span id="legend-min"></span>
+      <div class="bar"></div>
+      <span id="legend-max"></span>
+      <span style="margin-left:auto">color scale fixed across years</span>
+    </div>
+  </section>
+  <section class="panel">
+    <h2>Every park's score</h2>
+    <p class="sub">One dot per park; tick marks the district mean. Hover for park names.</p>
+    <div id="chart"></div>
+  </section>
+</main>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const RAMP = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
+const DATA_BASE = "../data/processed";
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+let fy = 2025, map, geo, points, byDistrict, domain;
+
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const tooltip = document.getElementById("tooltip");
+
+function rampStops() {
+  return RAMP.flatMap((c, i) => [domain[0] + (i / (RAMP.length - 1)) * (domain[1] - domain[0]), c]);
+}
+
+function districtStats(year) {
+  const rows = byDistrict.filter(r => r.fy === year);
+  return Object.fromEntries(rows.map(r => [r.district, r]));
+}
+
+function injectYear(year) {
+  const stats = districtStats(year);
+  for (const f of geo.features) {
+    const s = stats[Number(f.properties.sup_dist)];
+    f.properties.mean_score = s ? s.mean_score : null;
+    f.properties.n_parks = s ? s.n_parks : 0;
+    f.properties.supervisors = s ? s.supervisors : "";
+  }
+  return geo;
+}
+
+function baseStyle() {
+  const flavor = dark.matches ? "dark_all" : "light_all";
+  return {
+    version: 8,
+    sources: {
+      carto: {
+        type: "raster",
+        tiles: ["a", "b", "c", "d"].map(s =>
+          `https://${s}.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`),
+        tileSize: 256,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    },
+    layers: [{ id: "carto", type: "raster", source: "carto" }],
+  };
+}
+
+function initMap() {
+  if (map) map.remove();
+  map = new maplibregl.Map({
+    container: "map",
+    style: baseStyle(),
+    center: [-122.4423, 37.7551],
+    zoom: 10.9,
+    attributionControl: { compact: true },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+  map.once("style.load", () => {
+    map.addSource("districts", { type: "geojson", data: injectYear(fy) });
+    map.addLayer({
+      id: "districts-fill", type: "fill", source: "districts",
+      paint: {
+        "fill-color": ["interpolate", ["linear"], ["get", "mean_score"], ...rampStops()],
+        "fill-opacity": 0.72,
+      },
+    });
+    map.addLayer({
+      id: "districts-line", type: "line", source: "districts",
+      paint: { "line-color": css("--page"), "line-width": 1.2 },
+    });
+    map.on("mousemove", "districts-fill", e => {
+      const p = e.features[0].properties;
+      tooltip.innerHTML =
+        `<strong>District ${p.sup_dist}</strong>` +
+        `<div>mean score <span class="num">${Number(p.mean_score).toFixed(3)}</span> · ${p.n_parks} parks</div>` +
+        `<div class="sub">FY${fy} supervisor: ${p.supervisors}</div>`;
+      tooltip.style.display = "block";
+      tooltip.style.left = Math.min(e.originalEvent.clientX + 14, innerWidth - 300) + "px";
+      tooltip.style.top = e.originalEvent.clientY + 14 + "px";
+    });
+    map.on("mouseleave", "districts-fill", () => { tooltip.style.display = "none"; });
+  });
+}
+
+function chartSpec() {
+  const ink = css("--text-primary"), sub = css("--text-secondary"),
+        muted = css("--muted"), grid = css("--grid"), accent = css("--accent");
+  const pts = points.filter(p => p.fy === fy);
+  const means = byDistrict.filter(r => r.fy === fy)
+    .map(r => ({ district: r.district, score: r.mean_score }));
+  return {
+    $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+    width: "container", height: 430,
+    background: "transparent",
+    config: {
+      axis: { labelColor: sub, titleColor: muted, gridColor: grid, domainColor: grid,
+              tickColor: grid, labelFontSize: 11, titleFontSize: 11 },
+      view: { stroke: null },
+      font: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+    },
+    layer: [
+      {
+        data: { values: pts },
+        transform: [{ calculate: "random() - 0.5", as: "jitter" }],
+        mark: { type: "circle", size: 42, opacity: 0.5, color: accent },
+        encoding: {
+          x: { field: "score", type: "quantitative", scale: { domain: [0.6, 1.0] },
+               axis: { title: "park evaluation score", format: ".2f", tickCount: 8 } },
+          y: { field: "district", type: "ordinal", axis: { title: null, labelExpr: "'District ' + datum.value" } },
+          yOffset: { field: "jitter", type: "quantitative", scale: { range: [-14, 14] } },
+          tooltip: [
+            { field: "park", title: "park" },
+            { field: "park_type", title: "type" },
+            { field: "score", title: `FY${fy} score`, format: ".2f" },
+          ],
+        },
+      },
+      {
+        data: { values: means },
+        mark: { type: "tick", thickness: 2.5, height: 30, color: ink },
+        encoding: {
+          x: { field: "score", type: "quantitative" },
+          y: { field: "district", type: "ordinal" },
+          tooltip: [
+            { field: "district", title: "district" },
+            { field: "score", title: `FY${fy} mean`, format: ".3f" },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function renderChart() {
+  vegaEmbed("#chart", chartSpec(), { actions: false, renderer: "svg" });
+}
+
+function setYear(year) {
+  fy = year;
+  document.querySelectorAll("#years button").forEach(b =>
+    b.setAttribute("aria-pressed", String(Number(b.dataset.fy) === year)));
+  document.getElementById("map-sub").textContent =
+    `FY${year} · hover a district for its score and supervisor`;
+  const src = map && map.getSource("districts");
+  if (src) src.setData(injectYear(year));
+  renderChart();
+}
+
+async function main() {
+  [geo, points, byDistrict] = await Promise.all([
+    fetch(`${DATA_BASE}/supervisor_districts.geojson`).then(r => r.json()),
+    fetch(`${DATA_BASE}/park_scores_points.json`).then(r => r.json()),
+    fetch(`${DATA_BASE}/park_scores_by_district.json`).then(r => r.json()),
+  ]);
+  const means = byDistrict.map(r => r.mean_score);
+  domain = [Math.min(...means), Math.max(...means)];
+  document.getElementById("legend-min").textContent = domain[0].toFixed(2);
+  document.getElementById("legend-max").textContent = domain[1].toFixed(2);
+
+  const yearsEl = document.getElementById("years");
+  for (const y of [...new Set(byDistrict.map(r => r.fy))].sort()) {
+    const b = document.createElement("button");
+    b.dataset.fy = y;
+    b.textContent = `'${String(y).slice(2)}`;
+    b.setAttribute("aria-pressed", String(y === fy));
+    b.addEventListener("click", () => setYear(y));
+    yearsEl.appendChild(b);
+  }
+
+  try {
+    initMap();
+  } catch (e) {
+    console.error("map failed to initialize (WebGL unavailable?)", e);
+  }
+  setYear(fy);
+  dark.addEventListener("change", () => { initMap(); renderChart(); });
+}
+main();
+</script>
+</body>
+</html>
