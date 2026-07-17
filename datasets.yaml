@@ -52,6 +52,29 @@ datasets:
       comma-separated when a park spans districts; district assignments
       reflect current (post-2022) boundaries for all years.
 
+  parking_meters:
+    id: 8vzz-qzz9
+    format: csv
+    name: Parking Meters
+    notes: >-
+      SFMTA meter inventory: one row per meter post with exact lat/lon, cap
+      color, meter type (SS single-space / MS multi-space pay station),
+      active_meter_flag (M = active), jurisdiction, and pre-joined
+      supervisor_district / analysis_neighborhood. ~39k rows, updated weekly.
+
+  meter_policies:
+    id: qq7v-hds4
+    format: csv
+    name: Meter Policies
+    notes: >-
+      Current operating/rate schedule per metered space: one row per meter x
+      day-of-week x time window with scheduletype (OP paid / FREE / PRE
+      pre-payment / ALT / TOW) plus hourly rate and time limit. ~880k rows,
+      refreshed daily; effectively a snapshot (enddates are year 2200), so no
+      policy history. Joins to parking_meters on postid = post_id. Caveat:
+      ~25% of active meters (multi-space pay stations, most motorcycle
+      meters) have no policy rows; mspaystationid is never populated.
+
   tracts_to_neighborhoods:
     id: sevw-6tgi
     format: csv

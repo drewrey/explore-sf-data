@@ -16,11 +16,24 @@ DataSF (Socrata SODA API)
 data/raw/          as-downloaded, gitignored, always refetchable
         │  notebooks + processing scripts (GeoPandas, DuckDB)
         ▼
-data/processed/    small derived GeoJSON/JSON, committed to git
+data/processed/    derived GeoJSON/JSON the site reads
         │
         ▼
 site/              static site (MapLibre GL + Vega-Lite), no build step
 ```
+
+### Data policy
+
+- **`data/raw/` is never committed.** Every raw file is refetchable by script from
+  the IDs in `datasets.yaml`.
+- **Small processed outputs (roughly < 1 MB) are committed**, so a fresh clone can
+  browse the site and notebooks without hitting DataSF.
+- **Large processed outputs are gitignored** — each one is listed in `.gitignore`
+  with the script that regenerates it (e.g. `data/processed/meters.geojson` ←
+  `uv run scripts/process_meters.py`). Pages that depend on one of these say so
+  when the file is missing.
+- Consequence for publishing: a deploy (e.g. GitHub Pages) must run the
+  regeneration scripts as a build step, since the large files aren't in the repo.
 
 ## Layout
 
@@ -42,6 +55,9 @@ Requires [uv](https://docs.astral.sh/uv/).
 ```sh
 uv sync                                 # create venv, install deps
 uv run scripts/fetch_boundaries.py      # pull boundary data, write processed GeoJSON
+uv run scripts/process_park_scores.py   # park evaluation scores by district
+uv run scripts/process_meters.py        # parking meters + policies map data (~5 min:
+                                        #   downloads ~880k policy rows, gitignored output)
 uv run jupyter lab                      # explore in notebooks/
 python3 -m http.server 8000             # from repo root, then open
                                         # http://localhost:8000/site/

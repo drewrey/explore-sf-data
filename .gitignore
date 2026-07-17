@@ -1,5 +1,10 @@
-# Raw data is refetchable via scripts/fetch_boundaries.py — never committed
+# Raw data is refetchable via the scripts/ pipeline — never committed
 data/raw/
+
+# Large processed outputs are also kept out of git (see README "Data policy");
+# regenerate with the script named in the comment above each entry.
+# uv run scripts/process_meters.py
+data/processed/meters.geojson
 
 # Python
 .venv/

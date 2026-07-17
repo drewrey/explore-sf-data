@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SF Parking Meter Policies</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --nodata: #c3c2b7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --nodata: #52514e;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+  }
+  header { padding: 14px 20px 12px; border-bottom: 1px solid var(--border); }
+  nav { font-size: 13px; margin-bottom: 6px; }
+  nav a { color: var(--text-secondary); text-decoration: none; margin-right: 14px; }
+  nav a[aria-current] { color: var(--text-primary); font-weight: 650; }
+  nav a:hover { color: var(--accent); }
+  header h1 { font-size: 17px; font-weight: 650; }
+  header p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; max-width: 84ch; }
+  header a { color: var(--accent); }
+  .filters { display: flex; gap: 6px; padding: 10px 20px; flex-wrap: wrap; align-items: center; }
+  .filters .label { font-size: 12.5px; color: var(--muted); margin-right: 4px; }
+  .filters button {
+    font: inherit; font-size: 13px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 5px 14px;
+    cursor: pointer;
+  }
+  .filters button:hover { background: var(--surface-1); }
+  .filters button[aria-pressed="true"] {
+    color: var(--text-primary);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    font-weight: 600;
+  }
+  #wrap { position: relative; flex: 1; min-height: 0; }
+  #map { position: absolute; inset: 0; }
+  #legend {
+    position: absolute; left: 12px; bottom: 24px; z-index: 5;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    max-width: 240px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.10);
+  }
+  #legend h3 { font-size: 12px; font-weight: 650; margin-bottom: 6px; }
+  #legend .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; color: var(--text-secondary); }
+  #legend .swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; border: 1px solid var(--border); }
+  #legend .note { color: var(--muted); margin-top: 6px; font-size: 11px; }
+  #missing {
+    position: absolute; inset: 0; display: none; z-index: 6;
+    align-items: center; justify-content: center; text-align: center;
+    background: var(--page); padding: 30px; font-size: 14px; color: var(--text-secondary);
+  }
+  #missing code { background: var(--surface-1); border: 1px solid var(--border); border-radius: 5px; padding: 2px 7px; }
+  .tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 11px; font-size: 12.5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); max-width: 320px;
+  }
+  .tooltip .sub { color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <a href="index.html">Boundaries</a>
+    <a href="parks.html">Park scores</a>
+    <a href="meters.html" aria-current="page">Meter policies</a>
+  </nav>
+  <h1>Parking meter policies</h1>
+  <p>Every active SFMTA parking meter, colored by its current policy. Sources:
+     <a href="https://data.sfgov.org/d/8vzz-qzz9">Parking Meters</a> ·
+     <a href="https://data.sfgov.org/d/qq7v-hds4">Meter Policies</a> (DataSF; policies are a
+     daily snapshot of current schedules). About a quarter of active meters — multi-space pay
+     stations and most motorcycle meters — publish no schedule and show as “no data.”</p>
+</header>
+
+<div class="filters" role="group" aria-label="Policy facet" id="facets">
+  <span class="label">Color by</span>
+  <button data-facet="rate" aria-pressed="true">Midday rate</button>
+  <button data-facet="limit">Time limit</button>
+  <button data-facet="evening">Evening enforcement</button>
+  <button data-facet="sunday">Sunday operation</button>
+  <button data-facet="cap">Cap color</button>
+</div>
+
+<div id="wrap">
+  <div id="map"></div>
+  <div id="legend"></div>
+  <div id="missing">
+    <div>
+      <p><strong>meters.geojson isn’t built yet.</strong></p>
+      <p style="margin-top:8px">This map’s data file is large, so it isn’t committed to the repo.<br />
+      Generate it with <code>uv run scripts/process_meters.py</code>, then reload.</p>
+    </div>
+  </div>
+</div>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// Discrete classes beat a continuous ramp on 2-3px dots: bins are aligned to
+// the actual distributions (rates cluster $2.50-4; limits are 30min/1h/4h/24h)
+// and the blues are spaced far apart so adjacent classes stay tellable-apart.
+const RATE_BINS = ["#cde2fb", "#6da7ec", "#2a78d6", "#184f95", "#0d366b"];
+const LIMIT_BINS = ["#cde2fb", "#5598e7", "#1c5cab", "#0d366b"];
+const RAMP = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let map, facet = "rate";
+
+// The physical cap color IS the category; use hues that read as those colors.
+// Evaluated per render because "black" (and tow-away) must flip with the theme.
+const CAPS = () => ({
+  Grey:   { color: "#9c9a94", label: "Grey — general" },
+  Yellow: { color: "#eda100", label: "Yellow — commercial loading" },
+  Black:  { color: dark.matches ? "#e8e6df" : "#33322f", label: "Black — motorcycle" },
+  Green:  { color: "#008300", label: "Green — short-term" },
+  Red:    { color: "#e34948", label: "Red — six-wheel commercial" },
+  Blue:   { color: "#2a78d6", label: "Blue — disabled placard" },
+});
+
+const NODATA = () => css("--nodata");
+const TOW = () => (dark.matches ? "#e8e6df" : "#33322f");
+
+const FACETS = {
+  rate: {
+    title: "Hourly rate, weekday noon",
+    color: () => ["case",
+      ["==", ["get", "t"], "X"], NODATA(),
+      ["==", ["get", "t"], "F"], "#1baf7a",
+      ["==", ["get", "t"], "T"], TOW(),
+      ["step", ["coalesce", ["get", "r"], 0],
+        RATE_BINS[0], 2.5, RATE_BINS[1], 3, RATE_BINS[2], 4, RATE_BINS[3], 6, RATE_BINS[4]],
+    ],
+    legend: () => [
+      { label: "under $2.50/hr", color: RATE_BINS[0] },
+      { label: "$2.50–2.99", color: RATE_BINS[1] },
+      { label: "$3.00–3.99", color: RATE_BINS[2] },
+      { label: "$4.00–5.99", color: RATE_BINS[3] },
+      { label: "$6.00 and up", color: RATE_BINS[4] },
+      { label: "free at noon", color: "#1baf7a" },
+      { label: "tow-away at noon", color: TOW() },
+      { label: "no schedule data", color: NODATA() },
+    ],
+  },
+  limit: {
+    title: "Time limit (weekday noon)",
+    color: () => ["case",
+      ["==", ["get", "t"], "X"], NODATA(),
+      ["!", ["has", "l"]], NODATA(),
+      ["<=", ["get", "l"], 30], LIMIT_BINS[0],
+      ["<=", ["get", "l"], 60], LIMIT_BINS[1],
+      ["<=", ["get", "l"], 240], LIMIT_BINS[2],
+      LIMIT_BINS[3],
+    ],
+    legend: () => [
+      { label: "30 min or less", color: LIMIT_BINS[0] },
+      { label: "1 hour", color: LIMIT_BINS[1] },
+      { label: "2–4 hours", color: LIMIT_BINS[2] },
+      { label: "over 4 hours", color: LIMIT_BINS[3] },
+      { label: "no limit / no data", color: NODATA() },
+    ],
+  },
+  evening: {
+    title: "Enforced past 6pm (weekdays)",
+    color: () => ["case",
+      ["==", ["get", "t"], "X"], NODATA(),
+      ["==", ["get", "e"], 1], css("--accent"),
+      RAMP[0],
+    ],
+    legend: () => [
+      { label: "runs past 6pm", color: css("--accent") },
+      { label: "ends by 6pm", color: RAMP[0] },
+      { label: "no schedule data", color: NODATA() },
+    ],
+  },
+  sunday: {
+    title: "Operated on Sundays",
+    color: () => ["case",
+      ["==", ["get", "t"], "X"], NODATA(),
+      ["==", ["get", "s"], 1], css("--accent"),
+      RAMP[0],
+    ],
+    legend: () => [
+      { label: "metered on Sunday", color: css("--accent") },
+      { label: "free on Sunday", color: RAMP[0] },
+      { label: "no schedule data", color: NODATA() },
+    ],
+  },
+  cap: {
+    title: "Cap color (curb use)",
+    color: () => ["match", ["get", "c"],
+      ...Object.entries(CAPS()).flatMap(([k, v]) => [k, v.color]),
+      NODATA(),
+    ],
+    legend: () => [
+      ...Object.values(CAPS()).map(v => ({ label: v.label, color: v.color })),
+      { label: "other / unknown", color: NODATA() },
+    ],
+  },
+};
+
+function baseStyle() {
+  const flavor = dark.matches ? "dark_all" : "light_all";
+  return {
+    version: 8,
+    sources: {
+      carto: {
+        type: "raster",
+        tiles: ["a", "b", "c", "d"].map(s =>
+          `https://${s}.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`),
+        tileSize: 256,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      },
+    },
+    layers: [{ id: "carto", type: "raster", source: "carto" }],
+  };
+}
+
+function renderLegend() {
+  const f = FACETS[facet];
+  document.getElementById("legend").innerHTML =
+    `<h3>${f.title}</h3>` +
+    f.legend().map(r =>
+      `<div class="row"><span class="swatch" style="background:${r.color}"></span>${r.label}</div>`
+    ).join("") +
+    (facet === "rate" ? `<div class="note">Rate in effect Wednesdays at noon.</div>` : "");
+}
+
+function applyFacet() {
+  document.querySelectorAll("#facets button").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.facet === facet)));
+  if (map && map.getLayer("meters")) {
+    map.setPaintProperty("meters", "circle-color", FACETS[facet].color());
+  }
+  renderLegend();
+}
+
+const tooltip = document.getElementById("tooltip");
+const STATUS = { P: "paid", F: "free", T: "tow-away", X: "no schedule data" };
+
+function initMap(geojson) {
+  if (map) map.remove();
+  map = new maplibregl.Map({
+    container: "map",
+    style: baseStyle(),
+    center: [-122.4293, 37.7723],
+    zoom: 12.4,
+    attributionControl: { compact: true },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+  map.once("style.load", async () => {
+    // District outlines for orientation (small, committed file).
+    const districts = await fetch("../data/processed/supervisor_districts.geojson").then(r => r.json());
+    map.addSource("districts", { type: "geojson", data: districts });
+    map.addLayer({
+      id: "district-lines", type: "line", source: "districts",
+      paint: { "line-color": css("--muted"), "line-width": 0.8, "line-opacity": 0.5 },
+    });
+
+    map.addSource("meters", { type: "geojson", data: geojson });
+    map.addLayer({
+      id: "meters", type: "circle", source: "meters",
+      paint: {
+        "circle-color": FACETS[facet].color(),
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 1.7, 13, 3.4, 15, 6, 17, 10],
+        "circle-opacity": 0.9,
+      },
+    });
+
+    map.on("mousemove", "meters", e => {
+      const p = e.features[0].properties;
+      const noon = p.t === "P" ? `$${Number(p.r).toFixed(2)}/hr at weekday noon`
+                 : STATUS[p.t] + (p.t !== "X" ? " at weekday noon" : "");
+      tooltip.innerHTML =
+        `<strong>${p.n}</strong> <span class="sub">· ${p.p}</span>` +
+        `<div>${noon}${p.l ? ` · ${p.l / 60}h limit` : ""}</div>` +
+        (p.d ? `<div class="sub">${p.d}</div>` : "") +
+        (p.c ? `<div class="sub">${p.c} cap</div>` : "");
+      tooltip.style.display = "block";
+      tooltip.style.left = Math.min(e.originalEvent.clientX + 14, innerWidth - 340) + "px";
+      tooltip.style.top = e.originalEvent.clientY + 14 + "px";
+      map.getCanvas().style.cursor = "default";
+    });
+    map.on("mouseleave", "meters", () => {
+      tooltip.style.display = "none";
+      map.getCanvas().style.cursor = "";
+    });
+  });
+}
+
+document.querySelectorAll("#facets button").forEach(btn =>
+  btn.addEventListener("click", () => { facet = btn.dataset.facet; applyFacet(); }));
+
+async function main() {
+  const resp = await fetch("../data/processed/meters.geojson");
+  if (!resp.ok) {
+    document.getElementById("missing").style.display = "flex";
+    document.getElementById("legend").style.display = "none";
+    return;
+  }
+  const geojson = await resp.json();
+  initMap(geojson);
+  applyFacet();
+  dark.addEventListener("change", () => { initMap(geojson); applyFacet(); });
+}
+main();
+</script>
+</body>
+</html>
