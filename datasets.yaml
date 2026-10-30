@@ -84,3 +84,59 @@ datasets:
     notes: >-
       Crosswalk from 2020 census tracts to Analysis Neighborhoods, for
       rolling tract-level data up to neighborhoods without a spatial join.
+
+  # --- Resale, thrift & dumped furniture --------------------------------------
+
+  dumped_furniture_311:
+    id: vw6y-z8j6
+    format: csv
+    name: 311 Cases (filtered to dumped furniture & mattresses)
+    where: >-
+      service_subtype = 'garbage_and_debris'
+      AND service_details in ('furniture', 'mattress')
+    select: >-
+      service_request_id, requested_datetime, closed_date, status_description,
+      status_notes, agency_responsible, service_details, address,
+      supervisor_district, analysis_neighborhood, lat, long, source, media_url
+    notes: >-
+      311 reports of abandoned furniture / mattresses on streets and sidewalks
+      (Street and Sidewalk Cleaning -> garbage_and_debris). The furniture and
+      mattress detail tags only exist from 2024-06-13 on, so there's no
+      earlier history under these labels. The full 311 table is millions of
+      rows, hence the server-side filter.
+
+  used_goods_businesses:
+    id: g8m3-pdis
+    format: csv
+    name: Registered Business Locations (filtered to used-goods sellers)
+    where: >-
+      location_end_date IS NULL AND dba_end_date IS NULL
+      AND (self_reported_naics_code like '459510%'
+        OR self_reported_naics_code like '453310%'
+        OR upper(dba_name) like '%THRIFT%' OR upper(dba_name) like '%CONSIGN%'
+        OR upper(dba_name) like '%VINTAGE%' OR upper(dba_name) like '%RESALE%'
+        OR upper(dba_name) like '%SECONDHAND%' OR upper(dba_name) like '%SECOND HAND%'
+        OR upper(dba_name) like '%PAWN%' OR upper(dba_name) like '%ANTIQUE%'
+        OR upper(dba_name) like '%GOODWILL%' OR upper(dba_name) like '%SALVATION ARMY%'
+        OR upper(dba_name) like '%BUFFALO EXCHANGE%' OR upper(dba_name) like '%CROSSROADS TRADING%')
+    select: >-
+      uniqueid, dba_name, ownership_name, full_business_address, business_zip,
+      dba_start_date, location_start_date, self_reported_naics_code,
+      lic_code_description, location, supervisor_district,
+      neighborhoods_analysis_boundaries, business_corridor
+    notes: >-
+      Open business locations that self-report a used-merchandise NAICS code
+      (459510; 453310 in the pre-2022 NAICS) or whose name suggests resale.
+      NAICS is self-reported and the name match is loose ("vintage" catches
+      some wine bars), so the notebook flags which rule matched. Only
+      registered businesses -- no garage sales, flea markets, or online
+      resellers.
+
+  street_vending_permits:
+    id: 34ws-kyf6
+    format: csv
+    name: Street Vending Permits
+    notes: >-
+      Active/approved Public Works street-vendor permits (~150), nearly all
+      for merchandise, with free-text descriptions of goods and approximate
+      locations (roaming vendors have no lat/lon). Current snapshot only.
