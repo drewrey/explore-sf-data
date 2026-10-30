@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SF Dumped Furniture & Resale</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" />
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+<script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --border: rgba(11, 11, 11, 0.10);
+    --accent: #2a78d6;
+    --series-1: #2a78d6;
+    --series-2: #eb6834;
+    --neutral-bar: #c3c2b7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --text-primary: #ffffff;
+      --text-secondary: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #3987e5;
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --neutral-bar: #52514e;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--text-primary);
+  }
+  header { padding: 14px 20px 12px; border-bottom: 1px solid var(--border); }
+  nav { font-size: 13px; margin-bottom: 6px; }
+  nav a { color: var(--text-secondary); text-decoration: none; margin-right: 14px; }
+  nav a[aria-current] { color: var(--text-primary); font-weight: 650; }
+  nav a:hover { color: var(--accent); }
+  header h1 { font-size: 17px; font-weight: 650; }
+  header p { font-size: 13px; color: var(--text-secondary); margin-top: 2px; max-width: 84ch; }
+  header a, .caveats a { color: var(--accent); }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+    padding: 14px 20px 0;
+  }
+  @media (max-width: 880px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .stat {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat .value { font-size: 24px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .stat .label { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(340px, 1.15fr) minmax(340px, 1fr);
+    gap: 16px;
+    padding: 14px 20px 8px;
+  }
+  @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+  .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .panel {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .panel h2 { font-size: 13.5px; font-weight: 650; padding: 12px 14px 2px; }
+  .panel .sub { font-size: 12px; color: var(--text-secondary); padding: 0 14px 8px; }
+  .chart { padding: 0 8px 8px; }
+  #map { flex: 1; min-height: 560px; }
+  @media (max-width: 880px) { #map { flex: none; height: 440px; min-height: 0; } }
+
+  .toggles { display: flex; gap: 6px; padding: 0 14px 10px; flex-wrap: wrap; align-items: center; }
+  .toggles .label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+  .toggles button {
+    font: inherit; font-size: 12.5px;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 11px 3px 8px;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .toggles button[aria-pressed="true"] {
+    color: var(--text-primary);
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  .toggles button[aria-pressed="false"] .dot { opacity: 0.3; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--surface-1); flex: none; }
+  .dot.shop { background: var(--series-2); }
+  .dot.vendor { background: var(--text-primary); width: 12px; height: 12px; }
+
+  .legend { display: flex; align-items: center; gap: 4px; padding: 10px 14px; font-size: 11.5px; color: var(--muted); flex-wrap: wrap; }
+  .legend .swatch { width: 26px; height: 9px; }
+  .legend .swatch:first-of-type { border-radius: 4px 0 0 4px; }
+  .legend .swatch:last-of-type { border-radius: 0 4px 4px 0; }
+  .series-key { display: flex; gap: 14px; padding: 0 14px 4px; font-size: 12px; color: var(--text-secondary); }
+  .series-key span { display: inline-flex; align-items: center; gap: 6px; }
+  .series-key i { width: 14px; height: 2px; display: inline-block; }
+
+  .caveats { padding: 4px 20px 24px; font-size: 12px; color: var(--muted); max-width: 100ch; }
+  .caveats li { margin: 3px 0 3px 16px; }
+  .tooltip {
+    position: fixed; pointer-events: none; display: none; z-index: 10;
+    background: var(--surface-1); color: var(--text-primary);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 7px 11px; font-size: 12.5px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12); max-width: 300px;
+  }
+  .tooltip .sub { color: var(--text-secondary); }
+  .tooltip .num { font-weight: 650; }
+</style>
+</head>
+<body>
+<header>
+  <nav>
+    <a href="index.html">Boundaries</a>
+    <a href="parks.html">Park scores</a>
+    <a href="meters.html">Meter policies</a>
+    <a href="resale.html" aria-current="page">Dumped furniture &amp; resale</a>
+  </nav>
+  <h1>What San Francisco throws out vs. where it resells</h1>
+  <p>311 reports of furniture and mattresses dumped on streets and sidewalks, alongside the city's
+     registered used-goods shops and permitted second-hand street vendors. Sources (DataSF):
+     <a href="https://data.sf.gov/d/vw6y-z8j6">311 Cases</a> ·
+     <a href="https://data.sf.gov/d/g8m3-pdis">Registered Business Locations</a> ·
+     <a href="https://data.sf.gov/d/34ws-kyf6">Street Vending Permits</a>.
+     <span id="asof"></span></p>
+</header>
+
+<section class="stats" aria-label="Headline numbers">
+  <div class="stat"><div class="value" id="stat-reports">–</div><div class="label" id="stat-reports-label">dumped-item reports</div></div>
+  <div class="stat"><div class="value" id="stat-first">–</div><div class="label">reports on the 1st of the month vs. an average day</div></div>
+  <div class="stat"><div class="value" id="stat-shops">–</div><div class="label">registered used-goods shops</div></div>
+  <div class="stat"><div class="value" id="stat-vendors">–</div><div class="label" id="stat-vendors-label">second-hand street vendors</div></div>
+</section>
+
+<main>
+  <section class="panel">
+    <h2>Dumped furniture reports by neighborhood</h2>
+    <p class="sub">Shading: reports since tagging began. Hover a neighborhood, shop or vendor for details.</p>
+    <div class="toggles" role="group" aria-label="Map layers">
+      <span class="label">Show</span>
+      <button data-layer="shops" aria-pressed="true"><span class="dot shop"></span>Used-goods shops</button>
+      <button data-layer="vendors" aria-pressed="true"><span class="dot vendor"></span>Second-hand street vendors</button>
+    </div>
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <div class="stack">
+    <section class="panel">
+      <h2>Reports per month</h2>
+      <p class="sub">Peaks every summer, the main moving season. Full months only.</p>
+      <div class="series-key">
+        <span><i style="background:var(--series-1)"></i>furniture</span>
+        <span><i style="background:var(--series-2)"></i>mattress</span>
+      </div>
+      <div class="chart" id="monthly"></div>
+    </section>
+    <section class="panel">
+      <h2>Moving day: reports by day of the month</h2>
+      <p class="sub">Reports per calendar day relative to an average day (1.0). The 28th–3rd, when leases turn over, are highlighted.</p>
+      <div class="chart" id="dom"></div>
+    </section>
+    <section class="panel">
+      <h2>By day of the week</h2>
+      <p class="sub">Weekend dumping gets reported on Monday.</p>
+      <div class="chart" id="dow"></div>
+    </section>
+  </div>
+</main>
+
+<ul class="caveats" aria-label="Caveats">
+  <li>311 has tagged reports as furniture or mattress only since June 13, 2024. Reports count calls, not items: busy, walkable
+      areas with heavy 311 app use report more. Counts are not adjusted for population.</li>
+  <li>"Gone on arrival" is the share of reports Recology closed as <em>unable to locate</em>. Someone may have taken the item,
+      but the location may also have been vague.</li>
+  <li>Shops are open registered businesses with a used-merchandise industry code or a resale-sounding name, with false
+      matches removed by hand. Industry codes are self-reported.</li>
+  <li>Street vending permits are a snapshot of currently active permits only (the program issues roughly 150–180 a year),
+      and unpermitted vending isn't included. There is no DataSF data on garage sales or flea markets.</li>
+</ul>
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const DATA_BASE = "../data/processed";
+// Report-count classes: the Mission (~17k) sits far above everything else, so
+// discrete bins beat a continuous ramp that would wash out the other 40.
+const BINS = [1500, 3000, 4500, 6000];
+const RAMP = ["#cde2fb", "#86b6ef", "#3987e5", "#1c5cab", "#0d366b"];
+const dark = window.matchMedia("(prefers-color-scheme: dark)");
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const fmt = n => n.toLocaleString();
+const pct = v => v == null ? "–" : `${(v * 100).toFixed(1)}%`;
+const tooltip = document.getElementById("tooltip");
+let data, hoods, map;
+const visible = { shops: true, vendors: true };
+
+function baseStyle() {
+  // CARTO's keyless basemaps started returning "API KEY REQUIRED" tiles (seen
+  // 2026-10-30); OpenFreeMap's vector styles are free and need no key.
+  return `https://tiles.openfreemap.org/styles/${dark.matches ? "dark" : "positron"}`;
+}
+
+function points(rows, props) {
+  return {
+    type: "FeatureCollection",
+    features: rows.map(r => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [r.lon, r.lat] },
+      properties: props(r),
+    })),
+  };
+}
+
+function showTip(e, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = "block";
+  tooltip.style.left = Math.min(e.originalEvent.clientX + 14, innerWidth - 320) + "px";
+  tooltip.style.top = e.originalEvent.clientY + 14 + "px";
+}
+
+function renderLegend() {
+  const labels = ["under 1,500", "1,500–2,999", "3,000–4,499", "4,500–5,999", "6,000+"];
+  document.getElementById("legend").innerHTML =
+    `<span style="margin-right:6px">reports</span>` +
+    RAMP.map((c, i) => `<span class="swatch" style="background:${c}" title="${labels[i]}"></span>`).join("") +
+    `<span style="margin-left:6px">${labels[0]} → ${labels[4]}</span>`;
+}
+
+function initMap() {
+  if (map) map.remove();
+  map = new maplibregl.Map({
+    container: "map",
+    style: baseStyle(),
+    // Fit SF proper; the analysis neighborhoods' extent would include the Farallones.
+    bounds: [[-122.515, 37.705], [-122.355, 37.835]],
+    fitBoundsOptions: { padding: 12 },
+    attributionControl: { compact: true },
+  });
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }));
+  map.once("style.load", () => {
+    map.addSource("hoods", { type: "geojson", data: hoods });
+    map.addLayer({
+      id: "hoods-fill", type: "fill", source: "hoods",
+      paint: {
+        "fill-color": ["step", ["get", "reports"], RAMP[0], BINS[0], RAMP[1], BINS[1], RAMP[2],
+                       BINS[2], RAMP[3], BINS[3], RAMP[4]],
+        "fill-opacity": 0.75,
+      },
+    });
+    map.addLayer({
+      id: "hoods-line", type: "line", source: "hoods",
+      paint: { "line-color": css("--page"), "line-width": 1 },
+    });
+
+    map.addSource("shops", { type: "geojson",
+      data: points(data.shops, r => ({ name: r.name, address: r.address })) });
+    map.addLayer({
+      id: "shops", type: "circle", source: "shops",
+      layout: { visibility: visible.shops ? "visible" : "none" },
+      paint: {
+        "circle-color": css("--series-2"),
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 3.6, 14, 6.5],
+        "circle-stroke-color": css("--surface-1"), "circle-stroke-width": 1.5,
+      },
+    });
+    map.addSource("vendors", { type: "geojson",
+      data: points(data.vendors, r => ({ goods: r.goods })) });
+    map.addLayer({
+      id: "vendors", type: "circle", source: "vendors",
+      layout: { visibility: visible.vendors ? "visible" : "none" },
+      paint: {
+        "circle-color": css("--text-primary"),
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 5, 14, 8],
+        "circle-stroke-color": css("--surface-1"), "circle-stroke-width": 2,
+      },
+    });
+
+    // Points sit above the fill, so check them first and only fall back to the neighborhood.
+    map.on("mousemove", e => {
+      const layers = ["vendors", "shops", "hoods-fill"].filter(l => map.getLayoutProperty(l, "visibility") !== "none");
+      const f = map.queryRenderedFeatures(e.point, { layers })[0];
+      if (!f) { tooltip.style.display = "none"; return; }
+      const p = f.properties;
+      if (f.layer.id === "vendors") {
+        showTip(e, `<strong>Second-hand street vendor</strong><div class="sub">${p.goods}</div>`);
+      } else if (f.layer.id === "shops") {
+        showTip(e, `<strong>${p.name}</strong><div class="sub">${p.address}</div>`);
+      } else {
+        showTip(e,
+          `<strong>${p.nhood}</strong>` +
+          `<div><span class="num">${fmt(p.reports)}</span> dumped-item reports</div>` +
+          `<div class="sub">${pct(p.gone)} gone on arrival · ${p.shops} used-goods shops` +
+          (p.vendors ? ` · ${p.vendors} second-hand vendors` : "") + `</div>`);
+      }
+    });
+    map.on("mouseout", () => { tooltip.style.display = "none"; });
+  });
+}
+
+function vlConfig() {
+  return {
+    axis: { labelColor: css("--text-secondary"), titleColor: css("--muted"), gridColor: css("--grid"),
+            domainColor: css("--grid"), tickColor: css("--grid"), labelFontSize: 11, titleFontSize: 11 },
+    view: { stroke: null },
+    font: 'system-ui, -apple-system, "Segoe UI", sans-serif',
+  };
+}
+
+function monthlySpec() {
+  const values = data.monthly.flatMap(m => [
+    { month: `${m.month}-01`, type: "furniture", n: m.furniture },
+    { month: `${m.month}-01`, type: "mattress", n: m.mattress },
+  ]);
+  const color = { field: "type", type: "nominal", legend: null,
+                  scale: { domain: ["furniture", "mattress"], range: [css("--series-1"), css("--series-2")] } };
+  const x = { field: "month", type: "temporal", timeUnit: "yearmonth",
+              axis: { title: null, format: "%b %Y", tickCount: 6, grid: false, labelFlush: true } };
+  return {
+    $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+    width: "container", height: 200, background: "transparent",
+    autosize: { type: "fit-x", contains: "padding" },
+    padding: { left: 0, right: 22, top: 4, bottom: 0 },  // room for the last date label
+    config: vlConfig(),
+    data: { values },
+    encoding: { x },
+    layer: [
+      { mark: { type: "line", strokeWidth: 2 },
+        encoding: { y: { field: "n", type: "quantitative", axis: { title: "reports", tickCount: 4 } }, color } },
+      { transform: [{ pivot: "type", value: "n", groupby: ["month"] }],
+        params: [{ name: "hover", select: { type: "point", fields: ["month"], nearest: true,
+                                            on: "pointerover", clear: "pointerout" } }],
+        mark: { type: "rule", color: css("--muted"), strokeWidth: 1 },
+        encoding: {
+          opacity: { condition: { param: "hover", empty: false, value: 0.7 }, value: 0 },
+          tooltip: [
+            { field: "month", type: "temporal", timeUnit: "yearmonth", title: "month", format: "%B %Y" },
+            { field: "furniture", type: "quantitative", format: "," },
+            { field: "mattress", type: "quantitative", format: "," },
+          ],
+        } },
+      { transform: [{ filter: { param: "hover", empty: false } }],
+        mark: { type: "point", filled: true, size: 60, stroke: css("--surface-1"), strokeWidth: 2 },
+        encoding: { y: { field: "n", type: "quantitative" }, color } },
+    ],
+  };
+}
+
+function domSpec() {
+  return {
+    $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+    width: "container", height: 170, background: "transparent",
+    config: vlConfig(),
+    data: { values: data.day_of_month },
+    transform: [
+      { calculate: "datum.day >= 28 || datum.day <= 3", as: "turnover" },
+      { calculate: "format(datum.rel, '.2f') + '× an average day'", as: "label" },
+    ],
+    layer: [
+      { mark: { type: "bar", cornerRadiusTopLeft: 3, cornerRadiusTopRight: 3, width: { band: 0.78 } },
+        encoding: {
+          x: { field: "day", type: "ordinal", axis: { title: "day of month", labelAngle: 0,
+               labelExpr: "indexof([1,5,10,15,20,25,28,31], datum.value) >= 0 ? datum.label : ''" } },
+          y: { field: "rel", type: "quantitative", scale: { domain: [0, 1.4] },
+               axis: { title: null, tickCount: 4, format: ".1f" } },
+          color: { condition: { test: "datum.turnover", value: css("--accent") }, value: css("--neutral-bar") },
+          tooltip: [{ field: "day", title: "day" }, { field: "label", title: "reports" }],
+        } },
+      { data: { values: [{ y: 1 }] }, mark: { type: "rule", color: css("--muted"), strokeDash: [3, 3] },
+        encoding: { y: { field: "y", type: "quantitative" } } },
+    ],
+  };
+}
+
+function dowSpec() {
+  return {
+    $schema: "https://vega.github.io/schema/vega-lite/v5.json",
+    width: "container", height: 150, background: "transparent",
+    config: vlConfig(),
+    data: { values: data.weekday },
+    transform: [{ calculate: "format(datum.rel, '.2f') + '× an average weekday'", as: "label" }],
+    layer: [
+      { mark: { type: "bar", cornerRadiusTopRight: 3, cornerRadiusBottomRight: 3, height: { band: 0.7 } },
+        encoding: {
+          y: { field: "day", type: "ordinal", sort: null, axis: { title: null } },
+          x: { field: "rel", type: "quantitative", scale: { domain: [0, 1.4] },
+               axis: { title: null, tickCount: 4, format: ".1f" } },
+          color: { value: css("--accent") },
+          tooltip: [{ field: "day", title: "day" }, { field: "label", title: "reports" }],
+        } },
+      { data: { values: [{ x: 1 }] }, mark: { type: "rule", color: css("--muted"), strokeDash: [3, 3] },
+        encoding: { x: { field: "x", type: "quantitative" } } },
+    ],
+  };
+}
+
+function renderCharts() {
+  const opts = { actions: false, renderer: "svg" };
+  vegaEmbed("#monthly", monthlySpec(), opts);
+  vegaEmbed("#dom", domSpec(), opts);
+  vegaEmbed("#dow", dowSpec(), opts);
+}
+
+function renderStats() {
+  const m = data.meta;
+  const date = d => new Date(d + "T12:00:00").toLocaleDateString(undefined,
+    { year: "numeric", month: "short", day: "numeric" });
+  document.getElementById("stat-reports").textContent = fmt(m.reports);
+  document.getElementById("stat-reports-label").textContent =
+    `dumped-furniture and mattress reports since ${date(m.first_report)}`;
+  const first = data.day_of_month.find(d => d.day === 1).rel;
+  document.getElementById("stat-first").textContent = `${first.toFixed(2)}×`;
+  document.getElementById("stat-shops").textContent = fmt(m.shops);
+  document.getElementById("stat-vendors").textContent = fmt(m.secondhand_vendors);
+  document.getElementById("stat-vendors-label").textContent =
+    `second-hand street vendors (of ${m.vending_permits} active permits)`;
+  document.getElementById("asof").textContent = `311 reports through ${date(m.reports_as_of)}.`;
+}
+
+document.querySelectorAll(".toggles button").forEach(btn =>
+  btn.addEventListener("click", () => {
+    const layer = btn.dataset.layer;
+    visible[layer] = !visible[layer];
+    btn.setAttribute("aria-pressed", String(visible[layer]));
+    if (map && map.getLayer(layer)) {
+      map.setLayoutProperty(layer, "visibility", visible[layer] ? "visible" : "none");
+    }
+  }));
+
+async function main() {
+  let geo;
+  [data, geo] = await Promise.all([
+    fetch(`${DATA_BASE}/resale.json`).then(r => r.json()),
+    fetch(`${DATA_BASE}/analysis_neighborhoods.geojson`).then(r => r.json()),
+  ]);
+  for (const f of geo.features) Object.assign(f.properties, data.neighborhoods[f.properties.nhood] || { reports: 0 });
+  hoods = geo;
+
+  renderStats();
+  renderLegend();
+  try {
+    initMap();
+  } catch (e) {
+    console.error("map failed to initialize (WebGL unavailable?)", e);
+  }
+  renderCharts();
+  // The map panel stretches to the chart column's height after layout; keep the canvas in step.
+  new ResizeObserver(() => {
+    if (!map) return;
+    map.resize();
+    map.fitBounds([[-122.515, 37.705], [-122.355, 37.835]], { padding: 12, animate: false });
+  }).observe(document.getElementById("map"));
+  dark.addEventListener("change", () => { initMap(); renderCharts(); });
+}
+main();
+</script>
+</body>
+</html>
