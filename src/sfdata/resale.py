@@ -27,6 +27,49 @@ USED_GOODS_NAICS = ["459510", "453310"]  # 2022 / 2017 NAICS: used merchandise s
 
 SECONDHAND = re.compile(r"\bused\b|second[- ]?hand|2nd hand|antique|vintage|old clothes", re.I)
 
+# Reports about people's belongings or encampments, not dumped furniture. Excluded from
+# analysis by default (the explorer page can show them on request). Matched on status
+# notes, plus anything routed to the Healthy Streets Operation Center.
+ENCAMPMENT = re.compile(r"homeless|encamp|\btents?\b|sleeping|unhoused|\bcamp\b|\bhsoc\b|hot team", re.I)
+
+# Outcome categories from Recology's free-text status notes, checked in this order
+# (first match wins). "Bulky item pickup" = residents' scheduled BIR/BIC set-outs, i.e.
+# not dumping at all; "Building's responsibility" = items traced to a private property
+# or apartment complex that has to book (and sometimes pay for) its own pickup.
+OUTCOMES = [
+    ("Encampment-related", None),  # set from ENCAMPMENT / agency, below
+    ("Duplicate", re.compile(r"duplicate", re.I)),
+    ("Gone on arrival", re.compile(r"unable to locate|waste not found|nothing at this location|not out\b|no work needed", re.I)),
+    # Before bulky pickup: these notes mention "BIC pickup" as what the building must book.
+    ("Building's responsibility", re.compile(r"all items came from|needs? to call for", re.I)),
+    ("Bulky item pickup", re.compile(r"\bbir\b|b i r|\bbic\b|bulky.item|recology\.com|scheduled|set out", re.I)),
+    ("Building's responsibility", re.compile(r"private|personal property|housing", re.I)),
+    ("No access", re.compile(r"no access|inaccessible|bed ?bugs", re.I)),
+    ("Referred elsewhere", re.compile(r"reallocate|city can|\bdpw\b", re.I)),
+    ("Closed, other", re.compile(r"administrative closure|invalid|insufficient information", re.I)),
+    ("Picked up", re.compile(r"case resolved|resolved|done|sweep|debris", re.I)),
+]
+OUTCOME_NAMES = list(dict.fromkeys(name for name, _ in OUTCOMES)) + ["Closed, no note", "Open"]
+
+# Recology stopped writing free-text status notes on cases closed from this date on: only
+# "unable to locate" and "duplicate" (structured statuses) still appear. Every finer outcome,
+# and the encampment flag, can only be read from cases closed before it.
+NOTES_STOPPED = pd.Timestamp("2026-08-27")
+
+RESPONSE_BINS = [0, 1, 4, 24, float("inf")]
+RESPONSE_LABELS = ["under 1 h", "1–4 h", "4–24 h", "over 1 day"]
+
+
+def outcome_category(note: str, encampment: bool, status: str) -> str:
+    if encampment:
+        return "Encampment-related"
+    if status == "Open":
+        return "Open"
+    for name, pattern in OUTCOMES[1:]:
+        if pattern.search(note):
+            return name
+    return "Closed, no note" if not note.strip() else "Closed, other"
+
 
 def dumped_reports(refresh: bool = False) -> pd.DataFrame:
     """311 furniture/mattress reports with parsed times and a normalized outcome."""
@@ -39,6 +82,18 @@ def dumped_reports(refresh: bool = False) -> pd.DataFrame:
         df["status_notes"].fillna("").str.lower().str.replace("_", " ")
         .str.strip(" -").str.split(" - ").str[0].replace("", "(no note)")
     )
+    notes = df["status_notes"].fillna("").str.replace("_", " ")
+    df["encampment"] = notes.str.contains(ENCAMPMENT) | df["agency_responsible"].fillna("").str.contains(
+        "Healthy Streets", case=False
+    )
+    df["outcome_cat"] = [
+        outcome_category(n, e, s)
+        for n, e, s in zip(notes, df["encampment"], df["status_description"])
+    ]
+    hours = (df["closed"] - df["requested"]).dt.total_seconds() / 3600
+    df["hours_to_close"] = hours.where(hours >= 0)  # a handful close "before" they open
+    df["has_notes_era"] = df["closed"] < NOTES_STOPPED
+    df["response"] = pd.cut(df["hours_to_close"], RESPONSE_BINS, right=False, labels=RESPONSE_LABELS)
     return df
 
 
