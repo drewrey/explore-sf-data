@@ -1,6 +1,6 @@
 # explore-sf-data
 
-Exploring San Francisco open data from [DataSF](https://data.sfgov.org/), with a focus on
+Exploring San Francisco open data from [DataSF](https://data.sf.gov/), with a focus on
 transit/bicycling, the arts, housing, and effective government. The end product is an
 interactive website of maps and visualizations built from reproducible data pipelines.
 
@@ -32,6 +32,11 @@ site/              static site (MapLibre GL + Vega-Lite), no build step
   with the script that regenerates it (e.g. `data/processed/meters.geojson` ←
   `uv run scripts/process_meters.py`). Pages that depend on one of these say so
   when the file is missing.
+- **Refreshes are guarded.** DataSF occasionally publishes a partial extract (Meter
+  Policies dropped from ~880k rows to 5,687 on 2026-10-30). If a `--refresh` download
+  has under half the cached row count, the cached copy is kept and a warning printed;
+  `SFDATA_ALLOW_SHRINK=1` overrides. Each replaced raw file is kept one-deep in
+  `data/raw/prev/`.
 - Consequence for publishing: a deploy (e.g. GitHub Pages) must run the
   regeneration scripts as a build step, since the large files aren't in the repo.
 
@@ -64,11 +69,11 @@ python3 -m http.server 8000             # from repo root, then open
 ```
 
 An optional Socrata app token raises API rate limits: set `SODA_APP_TOKEN` in your
-environment (free at https://data.sfgov.org/profile/edit/developer_settings).
+environment (free at https://data.sf.gov/profile/edit/developer_settings).
 
 ## Adding a dataset
 
-1. Find it on data.sfgov.org and note the 9-character dataset ID (in the URL).
+1. Find it on data.sf.gov (formerly data.sfgov.org) and note the 9-character dataset ID (in the URL).
 2. Add an entry to `datasets.yaml`.
 3. `from sfdata import fetch; df = fetch.load("your_name")` — cached under `data/raw/`.
 

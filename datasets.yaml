@@ -1,10 +1,12 @@
 # Registry of DataSF datasets used in this project.
 #
 # Each entry:
-#   id:     9-character Socrata dataset ID (from the data.sfgov.org URL)
+#   id:     9-character Socrata dataset ID (from the data.sf.gov URL)
 #   format: geojson | csv   (how we fetch it from the SODA API)
 #   name:   official title on DataSF
 #   notes:  why we use it / anything non-obvious
+#   where:  optional SoQL $where filter applied server-side (for huge datasets)
+#   select: optional SoQL $select column list
 #
 # Fetch with:  from sfdata import fetch; gdf = fetch.load("supervisor_districts")
 
