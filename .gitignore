@@ -21,3 +21,6 @@ dist/
 # Vercel CLI link + local env (VERCEL_OIDC_TOKEN)
 .vercel/
 .env*
+
+# Private notes and plans (not for the public repo)
+*.private.md
