@@ -63,6 +63,7 @@ uv sync                                 # create venv, install deps
 uv run scripts/fetch_boundaries.py      # pull boundary data, write processed GeoJSON
 uv run scripts/process_park_scores.py   # park evaluation scores by district
 uv run scripts/process_resale.py        # dumped furniture, used-goods shops, vendors
+uv run scripts/process_dumped_reports.py  # report explorer data (~3.5 MB, gitignored output)
 uv run scripts/process_meters.py        # parking meters + policies map data (~5 min:
                                         #   downloads ~880k policy rows, gitignored output)
 # If DataSF publishes a broken extract (the refresh guard will warn), restore the

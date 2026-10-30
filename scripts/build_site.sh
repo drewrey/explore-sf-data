@@ -16,6 +16,7 @@ fi
 uv run scripts/fetch_boundaries.py --refresh
 uv run scripts/process_park_scores.py --refresh
 uv run scripts/process_resale.py --refresh
+uv run scripts/process_dumped_reports.py  # reuses the 311 data process_resale just fetched
 uv run scripts/process_meters.py --refresh
 
 # Pages fetch ../data/processed/, which resolves to /data/processed/ when they're served

@@ -5,6 +5,8 @@ data/raw/
 # regenerate with the script named in the comment above each entry.
 # uv run scripts/process_meters.py
 data/processed/meters.geojson
+# uv run scripts/process_dumped_reports.py
+data/processed/dumped_reports.json
 
 # Python
 .venv/
