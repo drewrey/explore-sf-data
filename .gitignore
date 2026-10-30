@@ -17,4 +17,7 @@ __pycache__/
 
 # Built site (scripts/build_site.sh)
 dist/
+
+# Vercel CLI link + local env (VERCEL_OIDC_TOKEN)
 .vercel/
+.env*

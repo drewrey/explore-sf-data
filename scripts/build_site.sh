@@ -6,6 +6,7 @@
 # pages carry the caveats (e.g. the meters page flags abnormally low schedule coverage).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+export UV_LINK_MODE=copy  # build machines can't hardlink from uv's cache
 
 if ! command -v uv >/dev/null; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
