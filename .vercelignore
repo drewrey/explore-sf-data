@@ -1,0 +1,8 @@
+# Uploaded by `vercel deploy`, but the build refetches everything from DataSF.
+.venv/
+data/raw/
+dist/
+notebooks/
+reports/
+**/__pycache__/
+.DS_Store

@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "echo 'uv and Python dependencies are installed by scripts/build_site.sh'",
+  "buildCommand": "bash scripts/build_site.sh",
+  "outputDirectory": "dist"
+}

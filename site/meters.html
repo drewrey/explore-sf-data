@@ -340,7 +340,8 @@ function showMeta(meta) {
   const notes = [];
   if (meta.coverage < 0.5) {
     notes.push(`Only ${Math.round(meta.coverage * 100)}% of meters have schedule data ` +
-      "(normally about 75%) — the schedule extract this was built from looks incomplete.");
+      "(normally about 75%). This site is built from live DataSF data, and DataSF’s current " +
+      "Meter Policies extract is incomplete, so most meters show as “no data” until it’s fixed.");
   } else if (lagDays > 30) {
     notes.push(`Schedules are ${Math.round(lagDays)} days older than the meter inventory: ` +
       "DataSF’s current schedule extract is incomplete, so this map uses the last complete " +
