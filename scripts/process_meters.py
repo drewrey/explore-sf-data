@@ -16,6 +16,11 @@ Per-meter properties (terse keys to keep the file small):
 Caveat baked into "t": ~25% of active meters (multi-space pay stations and
 most motorcycle meters) have no rows in the policies dataset -> t = "X".
 
+The FeatureCollection also carries a top-level "meta" object (meters_as_of,
+policies_as_of, coverage = share of meters with schedule data) so the page can
+show data dates and flag a degraded build. Policies may be older than the
+inventory if they were restored with scripts/restore_from_wayback.py.
+
 Run:  uv run scripts/process_meters.py [--refresh]
 """
 
@@ -144,16 +149,35 @@ def main() -> None:
             }
         )
 
+    df = pd.DataFrame([f["properties"] for f in features])
+    meta = {
+        "meters_as_of": pd.to_datetime(meters["data_as_of"]).max().date().isoformat(),
+        # Snapshot exports use 2026/04/13, the API 2026-04-13T00:00:00.000.
+        "policies_as_of": pd.to_datetime(policies["startdate"], format="mixed")
+        .max().date().isoformat(),
+        "coverage": round(float((df["t"] != "X").mean()), 3),
+    }
+
     dest = fetch.PROCESSED_DIR / "meters.geojson"
     with open(dest, "w") as f:
-        json.dump({"type": "FeatureCollection", "features": features}, f, separators=(",", ":"))
+        json.dump(
+            {"type": "FeatureCollection", "meta": meta, "features": features},
+            f, separators=(",", ":"),
+        )
 
-    df = pd.DataFrame([f["properties"] for f in features])
     print(f"\nwrote {len(features)} features -> {dest.relative_to(fetch.REPO_ROOT)}")
     print(f"size: {dest.stat().st_size / 1e6:.1f} MB")
     print("\nnoon status:\n", df["t"].value_counts().to_string())
     print("\nnoon rate ($/hr):\n", df["r"].describe().round(2).to_string())
     print("\nevening enforcement:", df["e"].sum(), "| sunday operation:", df["s"].sum())
+    print("\nmeta:", meta)
+    if meta["coverage"] < 0.5:
+        print(
+            f"\nWARNING: only {meta['coverage']:.0%} of meters have schedule data "
+            "(normally ~75%). The policies extract is probably incomplete; see "
+            "scripts/restore_from_wayback.py.",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

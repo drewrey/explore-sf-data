@@ -80,6 +80,14 @@
   #legend .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; color: var(--text-secondary); }
   #legend .swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; border: 1px solid var(--border); }
   #legend .note { color: var(--muted); margin-top: 6px; font-size: 11px; }
+  #asof { color: var(--muted); }
+  #degraded {
+    display: none; margin: 8px 20px 0; padding: 8px 12px; max-width: 84ch;
+    font-size: 13px; color: var(--text-primary);
+    background: color-mix(in srgb, #eda100 14%, transparent);
+    border: 1px solid color-mix(in srgb, #eda100 45%, transparent);
+    border-radius: 6px;
+  }
   #missing {
     position: absolute; inset: 0; display: none; z-index: 6;
     align-items: center; justify-content: center; text-align: center;
@@ -105,11 +113,13 @@
   </nav>
   <h1>Parking meter policies</h1>
   <p>Every active SFMTA parking meter, colored by its current policy. Sources:
-     <a href="https://data.sfgov.org/d/8vzz-qzz9">Parking Meters</a> ·
-     <a href="https://data.sfgov.org/d/qq7v-hds4">Meter Policies</a> (DataSF; policies are a
+     <a href="https://data.sf.gov/d/8vzz-qzz9">Parking Meters</a> ·
+     <a href="https://data.sf.gov/d/qq7v-hds4">Meter Policies</a> (DataSF; policies are a
      daily snapshot of current schedules). About a quarter of active meters — multi-space pay
-     stations and most motorcycle meters — publish no schedule and show as “no data.”</p>
+     stations and most motorcycle meters — publish no schedule and show as “no data.”
+     <span id="asof"></span></p>
 </header>
+<div id="degraded" role="note"></div>
 
 <div class="filters" role="group" aria-label="Policy facet" id="facets">
   <span class="label">Color by</span>
@@ -328,6 +338,29 @@ function initMap(geojson) {
 document.querySelectorAll("#facets button").forEach(btn =>
   btn.addEventListener("click", () => { facet = btn.dataset.facet; applyFacet(); }));
 
+// Data dates, plus a warning when the build looks degraded: DataSF sometimes
+// publishes a partial schedule extract, and older builds may lack "meta".
+function showMeta(meta) {
+  if (!meta) return;
+  const fmt = d => new Date(d + "T12:00:00").toLocaleDateString(undefined,
+    { year: "numeric", month: "short", day: "numeric" });
+  document.getElementById("asof").textContent =
+    `Meters as of ${fmt(meta.meters_as_of)}; schedules as of ${fmt(meta.policies_as_of)}.`;
+  const lagDays = (new Date(meta.meters_as_of) - new Date(meta.policies_as_of)) / 864e5;
+  const notes = [];
+  if (meta.coverage < 0.5) {
+    notes.push(`Only ${Math.round(meta.coverage * 100)}% of meters have schedule data ` +
+      "(normally about 75%) — the schedule extract this was built from looks incomplete.");
+  } else if (lagDays > 30) {
+    notes.push(`Schedules are ${Math.round(lagDays)} days older than the meter inventory: ` +
+      "DataSF’s current schedule extract is incomplete, so this map uses the last complete " +
+      "one (archived by the Internet Archive). Meters added since then show as “no data.”");
+  }
+  const box = document.getElementById("degraded");
+  box.textContent = notes.join(" ");
+  box.style.display = notes.length ? "block" : "none";
+}
+
 async function main() {
   const resp = await fetch("../data/processed/meters.geojson");
   if (!resp.ok) {
@@ -336,6 +369,7 @@ async function main() {
     return;
   }
   const geojson = await resp.json();
+  showMeta(geojson.meta);
   initMap(geojson);
   applyFacet();
   dark.addEventListener("change", () => { initMap(geojson); applyFacet(); });

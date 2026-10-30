@@ -63,6 +63,9 @@ uv run scripts/fetch_boundaries.py      # pull boundary data, write processed Ge
 uv run scripts/process_park_scores.py   # park evaluation scores by district
 uv run scripts/process_meters.py        # parking meters + policies map data (~5 min:
                                         #   downloads ~880k policy rows, gitignored output)
+# If DataSF publishes a broken extract (the refresh guard will warn), restore the
+# last good full export from the Internet Archive, then rerun the processing script:
+uv run scripts/restore_from_wayback.py meter_policies 20260413184235
 uv run jupyter lab                      # explore in notebooks/
 python3 -m http.server 8000             # from repo root, then open
                                         # http://localhost:8000/site/
