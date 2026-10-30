@@ -247,20 +247,9 @@ const FACETS = {
 };
 
 function baseStyle() {
-  const flavor = dark.matches ? "dark_all" : "light_all";
-  return {
-    version: 8,
-    sources: {
-      carto: {
-        type: "raster",
-        tiles: ["a", "b", "c", "d"].map(s =>
-          `https://${s}.basemaps.cartocdn.com/${flavor}/{z}/{x}/{y}@2x.png`),
-        tileSize: 256,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      },
-    },
-    layers: [{ id: "carto", type: "raster", source: "carto" }],
-  };
+  // CARTO's keyless basemaps started returning "API KEY REQUIRED" tiles (seen
+  // 2026-10-30); OpenFreeMap's vector styles are free and need no key.
+  return `https://tiles.openfreemap.org/styles/${dark.matches ? "dark" : "positron"}`;
 }
 
 function renderLegend() {
