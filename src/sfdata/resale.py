@@ -8,10 +8,11 @@ from __future__ import annotations
 
 import re
 
+import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from sfdata import fetch
+from sfdata import fetch, geo
 
 # Registered-business name matches that aren't resellers (reviewed by hand,
 # 2026-10-30): "thrifty" car rental, a coach named Goodwill, wine bars and
@@ -24,6 +25,18 @@ NOT_RESALE = re.compile(
     re.I,
 )
 USED_GOODS_NAICS = ["459510", "453310"]  # 2022 / 2017 NAICS: used merchandise stores
+
+# Charity-run thrift stores, matched on the registered owner (the DBA varies: "Goodwill
+# Boutique", "Out Of The Closet Thrift Store", ...). Reviewed by hand, 2026-11-12.
+CHARITY_OWNERS = re.compile(
+    r"goodwill of the san francisco bay|salvation army|aids healthcare foundation|"
+    r"^community thrift store$|san francisco rescue mission",
+    re.I,
+)
+# The Salvation Army registers its churches, shelters and offices too, under a placeholder
+# industry code (117868). Only rows with the used-merchandise code or a point-of-sale
+# license are stores.
+SALVATION_ARMY = re.compile(r"salvation army", re.I)
 
 SECONDHAND = re.compile(r"\bused\b|second[- ]?hand|2nd hand|antique|vintage|old clothes", re.I)
 
@@ -102,12 +115,18 @@ def used_goods_shops(refresh: bool = False) -> tuple[pd.DataFrame, pd.DataFrame]
     biz = fetch.load("used_goods_businesses", refresh=refresh)
     biz["naics"] = biz["self_reported_naics_code"].astype("Int64").astype(str)
     biz["rule"] = np.where(biz["naics"].isin(USED_GOODS_NAICS), "naics", "name")
-    excluded = biz[(biz.rule == "name") & biz.dba_name.str.contains(NOT_RESALE)]
+    sa_not_store = (
+        biz.ownership_name.str.contains(SALVATION_ARMY)
+        & (biz.naics != "459510")
+        & ~biz.lic_code_description.fillna("").str.contains("POINT OF SALE")
+    )
+    excluded = biz[((biz.rule == "name") & biz.dba_name.str.contains(NOT_RESALE)) | sa_not_store]
     shops = biz.drop(excluded.index)
     # No neighborhood = mailing-only or outside SF.
     shops = shops[shops.neighborhoods_analysis_boundaries.notna()].copy()
     xy = shops["location"].str.extract(r"POINT \(([-\d.]+) ([-\d.]+)\)").astype(float)
     shops["lon"], shops["lat"] = xy[0], xy[1]
+    shops["charity"] = shops.ownership_name.fillna("").str.contains(CHARITY_OWNERS)
     return shops, excluded
 
 
@@ -116,6 +135,20 @@ def street_vendors(refresh: bool = False) -> pd.DataFrame:
     vend = fetch.load("street_vending_permits", refresh=refresh)
     vend["secondhand"] = vend["describewhatyouwillsell"].fillna("").str.contains(SECONDHAND)
     return vend
+
+
+def donation_sites() -> pd.DataFrame:
+    """Clothing/household-goods donation sites (hand-curated, data/reference/donation_sites.csv).
+
+    kind: "donation_center" (attended: charity stores and donation centers that take
+    donations) or "bin" (unattended clothing drop box). Compiled 2026-11-12 from SF
+    Environment's SF Recycles directory, Goodwill's location feed and the Salvation Army's
+    site list; DataSF has no dataset of donation sites. Tagged with Analysis Neighborhood.
+    """
+    sites = fetch.load_reference("donation_sites")
+    points = gpd.GeoDataFrame(sites, geometry=gpd.points_from_xy(sites.lon, sites.lat), crs="EPSG:4326")
+    tagged = geo.assign_boundary(points, "analysis_neighborhoods", ["nhood"])
+    return pd.DataFrame(tagged.drop(columns="geometry")).rename(columns={"nhood": "analysis_neighborhood"})
 
 
 def relative_by_calendar_day(requested: pd.Series) -> pd.Series:
